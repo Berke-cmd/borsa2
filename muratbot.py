@@ -21,11 +21,9 @@ TAKIP_LISTESI = [
     "NVDA", "AAPL", "MSFT", "AMZN", "GC=F"
 ]
 
-
 KAYITLI_CHATLER = set()
-SON_SINYALLER = {}  
+SON_SINYALLER = {}
 is_manual_scanning = False
-
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -56,7 +54,6 @@ def telegram_bildir(mesaj: str, chat_id: str):
 def herkese_bildir(mesaj: str):
     for cid in list(KAYITLI_CHATLER):
         telegram_bildir(mesaj, cid)
-
 
 def calc_rsi(close: pd.Series, period: int = 14) -> pd.Series:
     delta = close.diff()
@@ -100,7 +97,6 @@ def calc_macd(close: pd.Series):
     signal_line = macd_line.ewm(span=9, adjust=False).mean()
     return macd_line, signal_line
 
--
 def sembol_detayli_analiz(sembol: str):
     try:
         df = yf.download(sembol, period="3mo", interval="1h", progress=False)
@@ -116,30 +112,25 @@ def sembol_detayli_analiz(sembol: str):
 
         fiyat = float(c.iloc[-1])
 
-       
         ema9 = float(c.ewm(span=9).mean().iloc[-1])
         ema21 = float(c.ewm(span=21).mean().iloc[-1])
         ema50 = float(c.ewm(span=50).mean().iloc[-1])
         sma200 = float(c.rolling(min(len(c), 200)).mean().iloc[-1])
 
-        
         rsi = float(calc_rsi(c, 14).iloc[-1])
         roc = float(calc_roc(c, 12).iloc[-1])
         cci = float(calc_cci(h, l, c, 20).iloc[-1])
         stoch_k, stoch_d = calc_stoch(h, l, c)
         sk, sd = float(stoch_k.iloc[-1]), float(stoch_d.iloc[-1])
 
-       
         atr = float(calc_atr(h, l, c, 14).iloc[-1])
         atr_pct = (atr / fiyat) * 100
         bb_upper, bb_mid, bb_lower = calc_bollinger(c)
         b_up, b_low = float(bb_upper.iloc[-1]), float(bb_lower.iloc[-1])
 
-    
         macd, macd_sig = calc_macd(c)
         m_val, m_sig = float(macd.iloc[-1]), float(macd_sig.iloc[-1])
 
-       
         vol_ort = float(v.rolling(20).mean().iloc[-1])
         vol_son = float(v.iloc[-1])
         vol_artisi = (vol_son > vol_ort * 1.2)
@@ -147,7 +138,6 @@ def sembol_detayli_analiz(sembol: str):
         fiyat_hl = (l.iloc[-1] > l.iloc[-2])
         dip_mesafe = ((fiyat - b_low) / fiyat) * 100
 
-        
         puan = 0
         if fiyat > ema9: puan += 1
         if ema9 > ema21: puan += 1
@@ -226,19 +216,14 @@ def tum_piyasayi_tara():
 
     return rapor
 
-
 def otomatik_tarayici():
-    """Her 15 dakikada bir otomatik tarar, A++ bir hisse bulursa anında iletir."""
-    print("[Otopilot] Otomatik 15 dakikalik tarayici devrede...", flush=True)
-    time.sleep(30)  
+    time.sleep(30)
     while True:
         try:
             if KAYITLI_CHATLER:
-                print("[Otopilot] Periyodik A++ kontrolu yapiliyor...", flush=True)
                 for sembol in TAKIP_LISTESI:
                     res = sembol_detayli_analiz(sembol)
                     if res and res["puan"] >= 14:
-                       
                         suan = time.time()
                         if sembol in SON_SINYALLER and (suan - SON_SINYALLER[sembol]) < 7200:
                             continue
@@ -251,19 +236,17 @@ def otomatik_tarayici():
                             f"• Kalite Puanı: {res['puan']}/18 🔥\n"
                             f"• Güncel Fiyat: {res['fiyat']:.2f}\n"
                             f"• RSI: {res['rsi']:.1f}\n"
-                            f"• ROC% (İvme): %{res['roc']:.2f}\n"
-                            f"• ATR% (Volatilite): %{res['atr_pct']:.2f}\n"
-                            f"• CCI (Momentum): {res['cci']:.1f}\n"
+                            f"• ROC%: %{res['roc']:.2f}\n"
+                            f"• ATR%: %{res['atr_pct']:.2f}\n"
+                            f"• CCI: {res['cci']:.1f}\n"
                             "━━━━━━━━━━━━━━━━━━━━\n"
-                            "Detaylı inceleme için: /analiz " + res['sembol']
+                            "Detaylı inceleme: /analiz " + res['sembol']
                         )
                         herkese_bildir(otomatik_mesaj)
         except Exception as e:
             print(f"[Otopilot Hatasi]: {e}", flush=True)
 
-        # 15 dakika bekle (900 saniye)
         time.sleep(900)
-
 
 def dinleyici():
     global is_manual_scanning
@@ -283,7 +266,7 @@ def dinleyici():
 
                     chat_id = str(msg.get("chat", {}).get("id", ""))
                     if chat_id:
-                        KAYITLI_CHATLER.add(chat_id)  
+                        KAYITLI_CHATLER.add(chat_id)
 
                     text = msg.get("text", "").strip()
                     parts = text.split()
@@ -296,7 +279,7 @@ def dinleyici():
                             "👑 Bababey Scanner Otopilot Aktif!\n"
                             "━━━━━━━━━━━━━━━━━━━━\n"
                             "• Bot arka planda 15 dakikada bir 18 parametreli A++ tarama yapar.\n"
-                            "• Elit bir fırsat yakaladığında otomatik olarak buraya bildirim atar.\n\n"
+                            "• Elit bir fırsat yakaladığında otomatik olarak bildirim atar.\n\n"
                             "Komutlar:\n"
                             "• /tara ➔ Anlık A++ ve uç değer raporu üretir\n"
                             "• /analiz SEMBOL ➔ Varlığı 18 parametreyle analiz eder\n"
@@ -363,10 +346,8 @@ def dinleyici():
             print(f"[Hata Polling]: {e}", flush=True)
         time.sleep(1)
 
-
 threading.Thread(target=dinleyici, daemon=True).start()
 threading.Thread(target=otomatik_tarayici, daemon=True).start()
-
 
 if __name__ == "__main__":
     run_server()
