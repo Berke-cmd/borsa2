@@ -10,7 +10,7 @@ import yfinance as yf
 
 sys.stdout.reconfigure(line_buffering=True)
 
-TELEGRAM_BOT_TOKEN = "8957698110:AAG3lx7jI7mirFy7xdsoy14hE_3y1gzL-eg"
+TELEGRAM_BOT_TOKEN = "8957698110:AAG3lx7jI7mirFy7xdsoy14hE_3ylgzL-eg"
 
 TAKIP_LISTESI = [
     "THYAO.IS", "TUPRS.IS", "ASELS.IS", "EREGL.IS", "KCHOL.IS",
