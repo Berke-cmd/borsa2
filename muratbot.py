@@ -10,7 +10,8 @@ import yfinance as yf
 
 sys.stdout.reconfigure(line_buffering=True)
 
-TELEGRAM_BOT_TOKEN = "AAG3lx7jI7mirFy7xdsoy14hE_3y1gzL-eg"
+
+TELEGRAM_BOT_TOKEN = "8957698110:AAG3lx7jI7mirFy7xdsoy14hE_3ylgzL-eg"
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -28,13 +29,15 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 def run_server():
     port = int(os.environ.get("PORT", 10000))
+    print(f"[HTTP] Web sunucusu port {port} uzerinde baslatiliyor...", flush=True)
     server = HTTPServer(("0.0.0.0", port), HealthHandler)
     server.serve_forever()
 
 def telegram_bildir(mesaj: str, chat_id: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     try:
-        requests.post(url, json={"chat_id": str(chat_id), "text": mesaj}, timeout=10)
+        r = requests.post(url, json={"chat_id": str(chat_id), "text": mesaj}, timeout=10)
+        print(f"[Telegram Yanit]: {r.status_code}", flush=True)
     except Exception as e:
         print(f"[Bildirim Hatasi]: {e}", flush=True)
 
@@ -65,8 +68,7 @@ PORTFOY = [
 
 def portfoy_metrik_tara():
     sonuclar = []
-    print("[Tarama] Analiz baslatildi...", flush=True)
-
+    print("[Tarama] Metrikler hesaplaniyor...", flush=True)
     for sembol in PORTFOY:
         try:
             df = yf.download(sembol, period="1mo", interval="1h", progress=False)
@@ -96,7 +98,7 @@ def portfoy_metrik_tara():
             continue
 
     if not sonuclar:
-        return "❌ Piyasa verisi alinamadi."
+        return "❌ Veri alinamadi."
 
     df_res = pd.DataFrame(sonuclar)
 
@@ -123,7 +125,7 @@ def portfoy_metrik_tara():
         f"• Min ATR% (Sıkışma/Squeeze): {min_atr['sembol']} ➔ %{min_atr['atr_pct']:.2f}\n"
         f"• Min CCI (Dip Dönüş Adayı): {min_cci['sembol']} ➔ {min_cci['cci']:.1f}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "⚡️ Anlık tarama: /tara"
+        "⚡️ Anlık tarama için: /tara"
     )
     return rapor
 
@@ -133,31 +135,31 @@ def dinleyici():
     while True:
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-            res = requests.get(url, params={"offset": son_id + 1, "timeout": 20}, timeout=25).json()
+            res = requests.get(url, params={"offset": son_id + 1, "timeout": 15}, timeout=20).json()
+            for u in res.get("result", []):
+                son_id = u["update_id"]
+                msg = u.get("message") or u.get("edited_message")
+                if not msg:
+                    continue
 
-            if "result" in res:
-                for u in res["result"]:
-                    son_id = u["update_id"]
-                    msg = u.get("message") or u.get("edited_message")
-                    if not msg:
-                        continue
+                chat_id = str(msg.get("chat", {}).get("id", ""))
+                text = msg.get("text", "").strip().lower()
 
-                    chat_id = msg.get("chat", {}).get("id")
-                    text = msg.get("text", "").strip().lower()
+                print(f"[Gelen Mesaj] Chat: {chat_id} | Metin: {text}", flush=True)
 
-                    print(f"--> [MESAJ GELDI] Chat: {chat_id} | Icerik: {text}", flush=True)
-
-                    if text in ["/start", "/yardim", "/help"]:
-                        telegram_bildir("👑 Bababey Scanner aktif!\n/tara yazarak anlık uç değer analizini alabilirsiniz.", chat_id)
-                    elif text in ["/tara", "tara"]:
-                        telegram_bildir("⏳ Piyasa taranıyor, lütfen 15-20 saniye bekleyin...", chat_id)
-                        rapor = portfoy_metrik_tara()
-                        telegram_bildir(rapor, chat_id)
+                if text in ["/start", "/yardim", "/help"]:
+                    telegram_bildir("👑 Bababey Scanner aktif!\n/tara yazarak anlık uç değer raporu alabilirsiniz.", chat_id)
+                elif text in ["/tara", "tara"]:
+                    telegram_bildir("⏳ Piyasa taranıyor, lütfen bekleyin...", chat_id)
+                    rapor = portfoy_metrik_tara()
+                    telegram_bildir(rapor, chat_id)
         except Exception as e:
-            print(f"[Hata Polling]: {e}", flush=True)
+            print(f"[Polling Hatasi]: {e}", flush=True)
         time.sleep(1)
 
-if "__name__== __main__":
-    t = threading.Thread(target=dinleyici, daemon=True)
-    t.start()
+
+threading.Thread(target=dinleyici, daemon=True).start()
+
+
+if __name__ == "__main__":
     run_server()
