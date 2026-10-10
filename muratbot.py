@@ -10,8 +10,7 @@ import yfinance as yf
 
 sys.stdout.reconfigure(line_buffering=True)
 
-
-TELEGRAM_BOT_TOKEN = "8957698110:AAG3lx7jI7mirFy7xdsoy14hE_3ylgzL-eg"
+TELEGRAM_BOT_TOKEN = "8957698110:AAG3lx7jI7mirFy7xdsoy14hE_3y1gzL-eg"
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -98,10 +97,11 @@ def portfoy_metrik_tara():
             continue
 
     if not sonuclar:
-        return "❌ Veri alinamadi."
+        return ["❌ Veri alinamadi."]
 
     df_res = pd.DataFrame(sonuclar)
 
+    # Uç Değerleri Belirleme
     max_roc = df_res.loc[df_res['roc'].idxmax()]
     min_roc = df_res.loc[df_res['roc'].idxmin()]
 
@@ -111,23 +111,37 @@ def portfoy_metrik_tara():
     max_cci = df_res.loc[df_res['cci'].idxmax()]
     min_cci = df_res.loc[df_res['cci'].idxmin()]
 
-    rapor = (
-        "👑 BABABEY QUANT SCANNER\n"
-        "📊 ROC | ATR% | CCI UÇ DEĞER RAPORU\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🚀 EN YÜKSEK DEĞERLER (Momentum Liderleri):\n"
-        f"• Max ROC (İvme): {max_roc['sembol']} ➔ %{max_roc['roc']:.2f}\n"
-        f"• Max ATR% (Volatilite): {max_atr['sembol']} ➔ %{max_atr['atr_pct']:.2f}\n"
-        f"• Max CCI (Kanal Aşımı): {max_cci['sembol']} ➔ {max_cci['cci']:.1f}\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "🧊 EN DÜŞÜK DEĞERLER (Dip & Sıkışma Adayları):\n"
-        f"• Min ROC (Dip/Aşırı Satım): {min_roc['sembol']} ➔ %{min_roc['roc']:.2f}\n"
-        f"• Min ATR% (Sıkışma/Squeeze): {min_atr['sembol']} ➔ %{min_atr['atr_pct']:.2f}\n"
-        f"• Min CCI (Dip Dönüş Adayı): {min_cci['sembol']} ➔ {min_cci['cci']:.1f}\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "⚡️ Anlık tarama için: /tara"
+    # 1. TÜM PORTFÖY LİSTESİ (ROC'a göre sıralı)
+    df_sorted = df_res.sort_values(by="roc", ascending=False)
+    
+    liste_metin = "👑 BABABEY QUANT SCANNER | TÜM PORTFÖY\n"
+    liste_metin += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    liste_metin += "Sembol | Fiyat | ROC% | ATR% | CCI\n"
+    liste_metin += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    
+    for _, row in df_sorted.iterrows():
+        s_name = row['sembol'].replace(".IS", "")
+        fiyat_str = f"{row['fiyat']:.2f}"
+        liste_metin += f"• {s_name:<7} | {fiyat_str:<7} | %{row['roc']:>+5.1f} | %{row['atr_pct']:>4.1f} | {row['cci']:>5.0f}\n"
+
+    
+    uc_degerler_metin = (
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "⚡️ GÜNÜN UÇ DEĞERLERİ (EKSTRA ÖZET)\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🚀 MOMENTUM LİDERLERİ (ZİRVE):\n"
+        f"• Max ROC (En Güçlü İvme): {max_roc['sembol']} ➔ %{max_roc['roc']:.2f}\n"
+        f"• Max ATR% (En Yüksek Oynaklık): {max_atr['sembol']} ➔ %{max_atr['atr_pct']:.2f}\n"
+        f"• Max CCI (Kanal Dışı Aşırı Alım): {max_cci['sembol']} ➔ {max_cci['cci']:.1f}\n\n"
+        "🧊 DİP & SIKIŞMA ADAYLARI (TABAN):\n"
+        f"• Min ROC (Aşırı Satım/Dip): {min_roc['sembol']} ➔ %{min_roc['roc']:.2f}\n"
+        f"• Min ATR% (Sıkışma/Patlama Adayı): {min_atr['sembol']} ➔ %{min_atr['atr_pct']:.2f}\n"
+        f"• Min CCI (Aşırı Satım Bölgesi): {min_cci['sembol']} ➔ {min_cci['cci']:.1f}\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        "🔄 Yeniden taramak için: /tara"
     )
-    return rapor
+
+    return [liste_metin, uc_degerler_metin]
 
 def dinleyici():
     print(">>> TELEGRAM LISTENER AKTIF EDILDI <<<", flush=True)
@@ -148,18 +162,19 @@ def dinleyici():
                 print(f"[Gelen Mesaj] Chat: {chat_id} | Metin: {text}", flush=True)
 
                 if text in ["/start", "/yardim", "/help"]:
-                    telegram_bildir("👑 Bababey Scanner aktif!\n/tara yazarak anlık uç değer raporu alabilirsiniz.", chat_id)
+                    telegram_bildir("👑 Bababey Scanner aktif!\n/tara yazarak tüm portföy listesini ve uç değer analizini alabilirsiniz.", chat_id)
                 elif text in ["/tara", "tara"]:
-                    telegram_bildir("⏳ Piyasa taranıyor, lütfen bekleyin...", chat_id)
-                    rapor = portfoy_metrik_tara()
-                    telegram_bildir(rapor, chat_id)
+                    telegram_bildir("⏳ Piyasa taranıyor (30 varlık), lütfen 15-20 saniye bekleyin...", chat_id)
+                    rapor_parcalari = portfoy_metrik_tara()
+                    for parca in rapor_parcalari:
+                        telegram_bildir(parca, chat_id)
+                        time.sleep(0.5)
         except Exception as e:
             print(f"[Polling Hatasi]: {e}", flush=True)
         time.sleep(1)
 
 
 threading.Thread(target=dinleyici, daemon=True).start()
-
 
 if __name__ == "__main__":
     run_server()
