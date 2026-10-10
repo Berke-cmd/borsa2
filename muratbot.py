@@ -1,6 +1,8 @@
 import os
 import sys
 import time
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
 import pandas as pd
 import numpy as np
@@ -9,6 +11,25 @@ import yfinance as yf
 sys.stdout.reconfigure(line_buffering=True)
 
 TELEGRAM_BOT_TOKEN = "8957698110:AAG3lx7jI7mirFy7xdsoy14hE_3y1gzL-eg"
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(b"Bababey Scanner Calisiyor!")
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        return
+
+def run_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
+    server.serve_forever()
 
 def telegram_bildir(mesaj: str, chat_id: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
@@ -44,7 +65,7 @@ PORTFOY = [
 
 def portfoy_metrik_tara():
     sonuclar = []
-    print("[Tarama] ROC, ATR% ve CCI verileri cekiliyor...", flush=True)
+    print("[Tarama] Analiz baslatildi...", flush=True)
 
     for sembol in PORTFOY:
         try:
@@ -75,7 +96,7 @@ def portfoy_metrik_tara():
             continue
 
     if not sonuclar:
-        return "❌ Veri alinamadi."
+        return "❌ Piyasa verisi alinamadi."
 
     df_res = pd.DataFrame(sonuclar)
 
@@ -102,31 +123,41 @@ def portfoy_metrik_tara():
         f"• Min ATR% (Sıkışma/Squeeze): {min_atr['sembol']} ➔ %{min_atr['atr_pct']:.2f}\n"
         f"• Min CCI (Dip Dönüş Adayı): {min_cci['sembol']} ➔ {min_cci['cci']:.1f}\n"
         "━━━━━━━━━━━━━━━━━━━━\n"
-        "⚡️ Anlık tarama için: /tara"
+        "⚡️ Anlık tarama: /tara"
     )
     return rapor
 
 def dinleyici():
-    print(">>> BOT AKTIF EDILDI, TELEGRAM MESAJLARI BEKLENIYOR...", flush=True)
+    print(">>> TELEGRAM LISTENER AKTIF EDILDI <<<", flush=True)
     son_id = 0
     while True:
         try:
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-            res = requests.get(url, params={"offset": son_id + 1, "timeout": 10}, timeout=15).json()
-            for u in res.get("result", []):
-                son_id = u["update_id"]
-                chat_id = str(u.get("message", {}).get("chat", {}).get("id", ""))
-                text = u.get("message", {}).get("text", "").strip()
+            res = requests.get(url, params={"offset": son_id + 1, "timeout": 20}, timeout=25).json()
 
-                if text in ["/start", "/yardim"]:
-                    telegram_bildir("👑 Bababey Scanner aktif!\n/tara yazarak anlık uç değer raporu alabilirsiniz.", chat_id)
-                elif text == "/tara":
-                    telegram_bildir("⏳ Piyasa taranıyor, lütfen bekleyin...", chat_id)
-                    rapor = portfoy_metrik_tara()
-                    telegram_bildir(rapor, chat_id)
+            if "result" in res:
+                for u in res["result"]:
+                    son_id = u["update_id"]
+                    msg = u.get("message") or u.get("edited_message")
+                    if not msg:
+                        continue
+
+                    chat_id = msg.get("chat", {}).get("id")
+                    text = msg.get("text", "").strip().lower()
+
+                    print(f"--> [MESAJ GELDI] Chat: {chat_id} | Icerik: {text}", flush=True)
+
+                    if text in ["/start", "/yardim", "/help"]:
+                        telegram_bildir("👑 Bababey Scanner aktif!\n/tara yazarak anlık uç değer analizini alabilirsiniz.", chat_id)
+                    elif text in ["/tara", "tara"]:
+                        telegram_bildir("⏳ Piyasa taranıyor, lütfen 15-20 saniye bekleyin...", chat_id)
+                        rapor = portfoy_metrik_tara()
+                        telegram_bildir(rapor, chat_id)
         except Exception as e:
-            pass
+            print(f"[Hata Polling]: {e}", flush=True)
         time.sleep(1)
 
 if __name__ == "__main__":
-    dinleyici()
+    t = threading.Thread(target=dinleyici, daemon=True)
+    t.start()
+    run_server()
