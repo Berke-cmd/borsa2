@@ -10,7 +10,7 @@ import yfinance as yf
 
 sys.stdout.reconfigure(line_buffering=True)
 
-TELEGRAM_BOT_TOKEN = "8957698110:AAG3lx7jI7mirFy7xdsoy14hE_3y1gzL-eg"
+TELEGRAM_BOT_TOKEN = "AAG3lx7jI7mirFy7xdsoy14hE_3y1gzL-eg"
 
 class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -157,7 +157,7 @@ def dinleyici():
             print(f"[Hata Polling]: {e}", flush=True)
         time.sleep(1)
 
-if __name__ == "__main__":
+if "__name__== __main__":
     t = threading.Thread(target=dinleyici, daemon=True)
     t.start()
     run_server()
